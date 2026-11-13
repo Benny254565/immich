@@ -1,6 +1,7 @@
 name: Cache Cleanup
 on:
   pull_request:
+    branches: [main, 'release/*']
     types:
       - closed
 

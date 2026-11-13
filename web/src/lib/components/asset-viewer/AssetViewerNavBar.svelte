@@ -15,6 +15,7 @@
   import { getAssetActions } from '#lib/services/asset.service.ts';
   import { getPersonAssetActions } from '#lib/services/person.service.ts';
   import { getStackActions } from '#lib/services/stack.service.ts';
+  import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
   import { getSharedLink, withoutIcons } from '#lib/utils.ts';
   import type { OnUndoDelete } from '#lib/utils/actions.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
@@ -76,7 +77,12 @@
     onAction: () => setPlayOriginalVideo(!isPlayingOriginalVideo),
   });
 
-  const Actions = $derived(getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album));
+  const showDesktopActions = $derived(!mediaQueryManager.pointerCoarse);
+  const Actions = $derived(
+    getAssetActions($t, { ...asset, stackPrimaryAssetId: stack?.primaryAssetId }, album, stack, {
+      showDesktopActions,
+    }),
+  );
   const StackActions = $derived(getStackActions($t, stack, asset));
   const sharedLink = getSharedLink();
 </script>
@@ -127,6 +133,8 @@
         <ActionMenuItem action={Actions.PlaySlideshow} />
 
         <ActionMenuItem action={Actions.Download} />
+        <ActionMenuItem action={Actions.DownloadRaw} />
+        <ActionMenuItem action={Actions.EditInPhotoshop} />
         <ActionMenuItem action={Actions.DownloadOriginal} />
 
         {#if !isLocked && asset.isTrashed}

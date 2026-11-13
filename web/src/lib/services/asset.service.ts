@@ -17,6 +17,7 @@ import { downloadUrl, getAssetMediaUrl, getSharedLink, sleep } from '#lib/utils.
 import type { OnFavorite } from '#lib/utils/actions.ts';
 import { handleError } from '#lib/utils/handle-error.ts';
 import { getFormatter } from '#lib/utils/i18n.ts';
+import { openImmichEdit, photoshopRawAsset, stackRawAssets } from '#lib/utils/raw-asset.ts';
 import {
   AssetJobName,
   AssetMediaSize,
@@ -30,6 +31,7 @@ import {
   type AlbumResponseDto,
   type AssetJobsDto,
   type AssetResponseDto,
+  type StackResponseDto,
 } from '@immich/sdk';
 import { modalManager, toastManager, type ActionItem } from '@immich/ui';
 import {
@@ -47,6 +49,7 @@ import {
   mdiHeadSyncOutline,
   mdiHeart,
   mdiHeartOutline,
+  mdiImageEditOutline,
   mdiImageRefreshOutline,
   mdiImageRemoveOutline,
   mdiImageSearch,
@@ -57,6 +60,7 @@ import {
   mdiMotionPlayOutline,
   mdiPlus,
   mdiPresentationPlay,
+  mdiRaw,
   mdiShareVariantOutline,
   mdiTagMultipleOutline,
   mdiTagPlusOutline,
@@ -177,6 +181,8 @@ export const getAssetActions = (
   $t: MessageFormatter,
   asset: AssetResponseDto & { stackPrimaryAssetId?: string },
   album?: AlbumResponseDto,
+  stack?: StackResponseDto,
+  viewer?: { showDesktopActions?: boolean },
 ) => {
   const sharedLink = getSharedLink();
   const authUser = authManager.authenticated ? authManager.user : undefined;
@@ -204,6 +210,27 @@ export const getAssetActions = (
     icon: mdiDownloadBox,
     $if: () => !!authUser && asset.isEdited,
     onAction: () => handleDownloadAsset(asset, { edited: false }),
+  };
+
+  const rawAssets = stackRawAssets(stack?.assets ?? []);
+  const photoshopAsset = photoshopRawAsset(stack?.assets ?? [], asset.id);
+
+  const DownloadRaw: ActionItem = {
+    title: $t('download_raw'),
+    icon: mdiRaw,
+    $if: () => !!authUser && rawAssets.length > 0,
+    onAction: () => handleDownloadRawAssets(rawAssets),
+  };
+
+  const EditInPhotoshop: ActionItem = {
+    title: $t('edit_in_photoshop'),
+    icon: mdiImageEditOutline,
+    $if: () => !!authUser && !!viewer?.showDesktopActions && !!photoshopAsset?.originalPath,
+    onAction: () => {
+      if (photoshopAsset?.originalPath) {
+        openImmichEdit({ id: photoshopAsset.id, originalPath: photoshopAsset.originalPath });
+      }
+    },
   };
 
   const SharedLinkDownload: ActionItem = {
@@ -395,6 +422,8 @@ export const getAssetActions = (
   return {
     Share,
     Download,
+    DownloadRaw,
+    EditInPhotoshop,
     DownloadOriginal,
     SharedLinkDownload,
     Offline,
@@ -470,6 +499,15 @@ export const handleDownloadAsset = async (asset: AssetResponseDto, { edited }: {
     } catch (error) {
       handleError(error, $t('errors.error_downloading', { values: { filename } }));
     }
+  }
+};
+
+const handleDownloadRawAssets = async (assets: AssetResponseDto[]) => {
+  for (const [index, asset] of assets.entries()) {
+    if (index !== 0) {
+      await sleep(500);
+    }
+    await handleDownloadAsset(asset, { edited: false });
   }
 };
 

@@ -2,6 +2,7 @@ name: Backport
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] no pull request code is checked out or executed
+    branches: [main, 'release/*']
     types: [closed, labeled]
 
 permissions: {}

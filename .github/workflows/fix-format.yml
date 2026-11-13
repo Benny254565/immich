@@ -2,6 +2,7 @@ name: Fix formatting
 
 on:
   pull_request:
+    branches: [main, 'release/*']
     types: [labeled]
 
 permissions: {}
