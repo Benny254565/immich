@@ -16,7 +16,7 @@
   import { getPersonAssetActions } from '#lib/services/person.service.ts';
   import { getStackActions } from '#lib/services/stack.service.ts';
   import { mediaQueryManager } from '#lib/stores/media-query-manager.svelte.ts';
-  import { getSharedLink, withoutIcons } from '#lib/utils.ts';
+  import { getSharedLink, isEnabled, withoutIcons } from '#lib/utils.ts';
   import type { OnUndoDelete } from '#lib/utils/actions.ts';
   import { toTimelineAsset } from '#lib/utils/timeline-util.ts';
   import {
@@ -124,6 +124,33 @@
     <ActionButton action={Actions.Unfavorite} />
     <ActionButton action={Actions.Edit} />
 
+    {#if isEnabled(Actions.EditInPhotoshop)}
+      <Tooltip text={$t('edit_in_photoshop')}>
+        {#snippet child({ props })}
+          <button
+            {...props}
+            type="button"
+            class="inline-flex size-10 items-center justify-center rounded-full hover:bg-dark/10"
+            aria-label={$t('edit_in_photoshop')}
+            onclick={(event) => Actions.EditInPhotoshop.onAction({ event, action: Actions.EditInPhotoshop })}
+          >
+            <svg viewBox="0 0 24 24" class="size-[18px]" aria-hidden="true">
+              <rect width="24" height="24" rx="5" fill="#31A8FF" />
+              <text
+                x="12"
+                y="16.5"
+                text-anchor="middle"
+                fill="#fff"
+                font-size="12"
+                font-weight="700"
+                font-family="Arial, sans-serif">Ps</text
+              >
+            </svg>
+          </button>
+        {/snippet}
+      </Tooltip>
+    {/if}
+
     {#if isOwner}
       <DeleteAction {asset} {onAction} {preAction} {onUndoDelete} />
     {/if}
@@ -134,7 +161,6 @@
 
         <ActionMenuItem action={Actions.Download} />
         <ActionMenuItem action={Actions.DownloadRaw} />
-        <ActionMenuItem action={Actions.EditInPhotoshop} />
         <ActionMenuItem action={Actions.DownloadOriginal} />
 
         {#if !isLocked && asset.isTrashed}
