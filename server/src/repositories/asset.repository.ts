@@ -173,6 +173,49 @@ const withBoundingBox = <T>(qb: SelectQueryBuilder<DB, 'asset' | 'asset_exif', T
   );
 };
 
+function primaryInSameView(eb: ExpressionBuilder<DB, 'asset'>, options: TimeBucketOptions) {
+  return eb
+    .selectFrom('stack')
+    .innerJoin('asset as primary_asset', 'primary_asset.id', 'stack.primaryAssetId')
+    .$if(!!options.albumId, (qb) =>
+      qb
+        .innerJoin('album_asset as primary_album_asset', 'primary_album_asset.assetId', 'primary_asset.id')
+        .where('primary_album_asset.albumId', '=', asUuid(options.albumId!)),
+    )
+    .$if(!!options.tagId, (qb) =>
+      qb.where((inner) =>
+        inner.exists(
+          inner
+            .selectFrom('tag_closure')
+            .innerJoin('tag_asset', 'tag_asset.tagId', 'tag_closure.id_descendant')
+            .whereRef('tag_asset.assetId', '=', 'primary_asset.id')
+            .where('tag_closure.id_ancestor', '=', options.tagId!),
+        ),
+      ),
+    )
+    .$if(!!options.personId, (qb) =>
+      qb.where((inner) =>
+        inner.exists(
+          inner
+            .selectFrom('asset_face')
+            .whereRef('asset_face.assetId', '=', 'primary_asset.id')
+            .where('asset_face.personGroupId', '=', asUuid(options.personId!))
+            .where('asset_face.deletedAt', 'is', null)
+            .where('asset_face.isVisible', 'is', true),
+        ),
+      ),
+    )
+    .$if(
+      options.visibility === AssetVisibility.Locked ||
+        options.visibility === AssetVisibility.Archive ||
+        (!!options.personId && options.visibility !== undefined),
+      (qb) => qb.where('primary_asset.visibility', '=', options.visibility!),
+    )
+    .where('primary_asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
+    .whereRef('stack.id', '=', 'asset.stackId')
+    .whereRef('stack.primaryAssetId', '!=', 'asset.id');
+}
+
 @Injectable()
 export class AssetRepository {
   constructor(@InjectKysely() private db: Kysely<DB>) {}
@@ -751,6 +794,12 @@ export class AssetRepository {
 
   @GenerateSql({ params: [{}, { user: { id: DummyValue.UUID } }] })
   async getTimeBuckets(options: TimeBucketOptions, auth: AuthDto): Promise<TimeBucketItem[]> {
+    const stackMembersStayVisible =
+      !!options.albumId ||
+      !!options.tagId ||
+      !!options.personId ||
+      options.visibility === AssetVisibility.Locked ||
+      options.visibility === AssetVisibility.Archive;
     return this.db
       .with('asset', (qb) =>
         qb
@@ -780,32 +829,15 @@ export class AssetRepository {
               .where('album_asset.albumId', '=', asUuid(options.albumId!)),
           )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
-          .$if(!!options.withStacked && !options.albumId, (qb) =>
+          .$if(!!options.withStacked && !stackMembersStayVisible, (qb) =>
             qb
               .leftJoin('stack', (join) =>
                 join.onRef('stack.id', '=', 'asset.stackId').onRef('stack.primaryAssetId', '=', 'asset.id'),
               )
               .where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
           )
-          .$if(!!options.withStacked && !!options.albumId, (qb) =>
-            qb.where((eb) =>
-              eb.not(
-                eb.exists(
-                  eb
-                    .selectFrom('stack')
-                    .innerJoin('asset as primary_asset', 'primary_asset.id', 'stack.primaryAssetId')
-                    .innerJoin(
-                      'album_asset as primary_album_asset',
-                      'primary_album_asset.assetId',
-                      'primary_asset.id',
-                    )
-                    .where('primary_album_asset.albumId', '=', asUuid(options.albumId!))
-                    .where('primary_asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
-                    .whereRef('stack.id', '=', 'asset.stackId')
-                    .whereRef('stack.primaryAssetId', '!=', 'asset.id'),
-                ),
-              ),
-            ),
+          .$if(!!options.withStacked && stackMembersStayVisible, (qb) =>
+            qb.where((eb) => eb.not(eb.exists(primaryInSameView(eb as ExpressionBuilder<DB, 'asset'>, options)))),
           )
           .$if(!!options.userIds, (qb) =>
             qb.where((eb) => {
@@ -835,6 +867,12 @@ export class AssetRepository {
   getTimeBucket(timeBucket: string, options: TimeBucketOptions, auth: AuthDto) {
     const order = options.order ?? 'desc';
     const bucket = timeBucket.replace(/^[+-]/, '');
+    const stackMembersStayVisible =
+      !!options.albumId ||
+      !!options.tagId ||
+      !!options.personId ||
+      options.visibility === AssetVisibility.Locked ||
+      options.visibility === AssetVisibility.Archive;
     const query = this.db
       .with('cte', (qb) =>
         qb
@@ -915,23 +953,8 @@ export class AssetRepository {
           .$if(!!options.withStacked, (qb) =>
             qb
               .where((eb) =>
-                options.albumId
-                  ? eb.not(
-                      eb.exists(
-                        eb
-                          .selectFrom('stack')
-                          .innerJoin('asset as primary_asset', 'primary_asset.id', 'stack.primaryAssetId')
-                          .innerJoin(
-                            'album_asset as primary_album_asset',
-                            'primary_album_asset.assetId',
-                            'primary_asset.id',
-                          )
-                          .where('primary_album_asset.albumId', '=', asUuid(options.albumId!))
-                          .where('primary_asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
-                          .whereRef('stack.id', '=', 'asset.stackId')
-                          .whereRef('stack.primaryAssetId', '!=', 'asset.id'),
-                      ),
-                    )
+                stackMembersStayVisible
+                  ? eb.not(eb.exists(primaryInSameView(eb as ExpressionBuilder<DB, 'asset'>, options)))
                   : eb.not(
                       eb.exists(
                         eb

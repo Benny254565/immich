@@ -29,7 +29,7 @@
   let { data }: Props = $props();
 
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { visibility: AssetVisibility.Locked };
+  const options = { visibility: AssetVisibility.Locked, withStacked: true };
 
   const handleEscape = () => {
     if (!assetMultiSelectManager.selectionActive) {
@@ -64,6 +64,7 @@
     enableRouting={true}
     bind:timelineManager
     {options}
+    withStacked={true}
     assetInteraction={assetMultiSelectManager}
     onEscape={handleEscape}
     removeAction={AssetAction.SET_VISIBILITY_TIMELINE}

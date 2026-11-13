@@ -343,5 +343,86 @@ describe(TimelineService.name, () => {
       const timelineBucket = JSON.parse(await sut.getTimeBucket(auth, { timeBucket: '1970-02-01', withStacked: true }));
       expect(timelineBucket.id).toEqual([loose.id, jpgOutside.id, jpgInAlbum.id]);
     });
+
+    it('keeps a lone member in tag, archive, locked, and person views', async () => {
+      const { sut, ctx } = setup();
+      const { user } = await ctx.newUser();
+      const auth = factory.auth({ user: { id: user.id } });
+      const elevated = factory.auth({ user: { id: user.id }, session: { hasElevatedPermission: true } });
+
+      const make = async (name: string, day: string, extra: { visibility?: AssetVisibility } = {}) => {
+        const { asset } = await ctx.newAsset({
+          ownerId: user.id,
+          originalFileName: name,
+          localDateTime: new Date(`1970-03-${day}T00:00:00.000Z`),
+          ...extra,
+        });
+        await ctx.newExif({ assetId: asset.id, make: 'Canon' });
+        return asset;
+      };
+
+      const tagJpg = await make('tag.jpg', '10');
+      const tagRaw = await make('tag.cr3', '11');
+      const tagOutside = await make('tag-out.jpg', '12');
+      const tagAlone = await make('tag-alone.cr3', '13');
+      await ctx.newStack({ ownerId: user.id }, [tagJpg.id, tagRaw.id]);
+      await ctx.newStack({ ownerId: user.id }, [tagOutside.id, tagAlone.id]);
+      const { tag } = await ctx.newTag({ userId: user.id, value: 'raw' });
+      await ctx.newTagAsset({ tagIds: [tag.id], assetIds: [tagJpg.id, tagRaw.id, tagAlone.id] });
+      const tagBucket = JSON.parse(
+        await sut.getTimeBucket(auth, { tagId: tag.id, timeBucket: '1970-03-01', withStacked: true }),
+      );
+      expect(tagBucket.id).toEqual([tagAlone.id, tagJpg.id]);
+
+      const archiveJpg = await make('arch.jpg', '14', { visibility: AssetVisibility.Archive });
+      const archiveRaw = await make('arch.cr3', '15', { visibility: AssetVisibility.Archive });
+      const archiveOutside = await make('arch-out.jpg', '16');
+      const archiveAlone = await make('arch-alone.cr3', '17', { visibility: AssetVisibility.Archive });
+      await ctx.newStack({ ownerId: user.id }, [archiveJpg.id, archiveRaw.id]);
+      await ctx.newStack({ ownerId: user.id }, [archiveOutside.id, archiveAlone.id]);
+      const archiveBucket = JSON.parse(
+        await sut.getTimeBucket(auth, {
+          visibility: AssetVisibility.Archive,
+          timeBucket: '1970-03-01',
+          withStacked: true,
+        }),
+      );
+      expect(archiveBucket.id).toEqual([archiveAlone.id, archiveJpg.id]);
+
+      const lockedJpg = await make('lock.jpg', '18', { visibility: AssetVisibility.Locked });
+      const lockedRaw = await make('lock.cr3', '19', { visibility: AssetVisibility.Locked });
+      const lockedOutside = await make('lock-out.jpg', '20');
+      const lockedAlone = await make('lock-alone.cr3', '21', { visibility: AssetVisibility.Locked });
+      await ctx.newStack({ ownerId: user.id }, [lockedJpg.id, lockedRaw.id]);
+      await ctx.newStack({ ownerId: user.id }, [lockedOutside.id, lockedAlone.id]);
+      const lockedBucket = JSON.parse(
+        await sut.getTimeBucket(elevated, {
+          visibility: AssetVisibility.Locked,
+          timeBucket: '1970-03-01',
+          withStacked: true,
+        }),
+      );
+      expect(lockedBucket.id).toEqual([lockedAlone.id, lockedJpg.id]);
+
+      const { person } = await ctx.newPerson({ ownerId: user.id });
+      const personJpg = await make('person.jpg', '22');
+      const personRaw = await make('person.cr3', '23');
+      const personOutside = await make('person-out.jpg', '24');
+      const personAlone = await make('person-alone.cr3', '25');
+      await ctx.newStack({ ownerId: user.id }, [personJpg.id, personRaw.id]);
+      await ctx.newStack({ ownerId: user.id }, [personOutside.id, personAlone.id]);
+      await ctx.newAssetFace({ assetId: personJpg.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: personRaw.id, personGroupId: person.personGroupId });
+      await ctx.newAssetFace({ assetId: personAlone.id, personGroupId: person.personGroupId });
+      const personBucket = JSON.parse(
+        await sut.getTimeBucket(auth, {
+          personId: person.personGroupId,
+          visibility: AssetVisibility.Timeline,
+          timeBucket: '1970-03-01',
+          withStacked: true,
+        }),
+      );
+      expect(personBucket.id).toEqual([personAlone.id, personJpg.id]);
+    });
   });
 });
