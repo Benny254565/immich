@@ -2,6 +2,7 @@ name: Auto-close PRs
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers]
+    branches: [main, 'release/*']
     types: [opened, edited, labeled]
 
 permissions: {}

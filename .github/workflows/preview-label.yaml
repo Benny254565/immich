@@ -2,6 +2,7 @@ name: Preview label
 
 on:
   pull_request:
+    branches: [main, 'release/*']
     types: [labeled, closed]
 
 permissions: {}

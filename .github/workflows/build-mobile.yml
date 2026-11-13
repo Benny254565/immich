@@ -37,6 +37,7 @@ on:
       FASTLANE_TEAM_ID:
         required: true
   pull_request:
+    branches: [main, 'release/*']
   push:
     branches: [main, 'release/*']
 
