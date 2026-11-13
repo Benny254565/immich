@@ -44,6 +44,32 @@
   <a href="readme_i18n/README_ml_IN.md">മലയാളം</a>
 </p>
 
+## About this fork
+
+This repository is an unofficial personal fork of [Immich](https://github.com/immich-app/immich). It is not supported by the Immich team. The code below this section is the upstream README.
+
+The custom server image is built from Immich **v3.4.1**:
+
+- `ghcr.io/benny254565/immich-server:v3.4.1-custom`
+- `ghcr.io/benny254565/immich-server:custom-latest`
+
+To use it, change only the Immich **server** image to that address and tag. Leave machine learning and the database on the official v3.4.1 images. On TrueNAS, set the app’s server image to `ghcr.io/benny254565/immich-server` and the tag to `v3.4.1-custom`. The package may be private until you make it public or give the host a GHCR login.
+
+### What changed
+
+**Stack collapse.** In Albums, Tags, the Locked folder, People, Archive, and shared album links, a stacked RAW+JPEG pair shows as one tile when the stack primary (usually the JPEG) is in that view. A RAW whose primary is not in the view still shows on its own.
+
+**Download RAW.** In the asset viewer, if the open stack contains a RAW file, Download RAW saves that original in one click.
+
+**RAW label.** RAW files in the viewer’s stack strip show a RAW badge, based on the file type.
+
+**Edit in Photoshop.** On a desktop browser, a Ps button next to Delete opens:
+
+`immich-edit://open?assetId=<id>&path=<urlencoded-server-path>`
+
+`assetId` is the RAW asset. `path` is that file’s path as stored on the server, percent-encoded (`/` becomes `%2F`). A web page cannot start Photoshop. A small helper on the Windows PC must register the `immich-edit` scheme, decode the path, map it onto the file the PC can open, and launch Photoshop.
+
+Search results (including Places) and map markers are not collapsed. Both files in a stack still appear there.
 
 > [!WARNING]
 > ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
